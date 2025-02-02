@@ -1,6 +1,9 @@
+#include "control_group.c"
+#include "entity_array.c"
 #include "raylib.h"
 #include <math.h>
 #include <stdint.h>
+#include <stdio.h>
 
 typedef enum { CMD_NONE, CMD_MOVE, CMD_ATTACK, CMD_INTERACT } CommandType;
 
@@ -14,27 +17,39 @@ typedef struct Command {
   Point target;
 } Command;
 
-typedef struct MY_CIRCLE {
-  int X;
-  int Y;
-  float Radius;
-  Color Color;
-} MY_CIRCLE;
+Rectangle BoxSelect(Vector2 drag_start) {
+  Vector2 current_mouse_pos = GetMousePosition();
+  float width = current_mouse_pos.x - drag_start.x;
+  float height = current_mouse_pos.y - drag_start.y;
 
-void gravity_on_circle(MY_CIRCLE *circle, int screen_height) {
-  if (circle->Y + circle->Radius >= screen_height) {
-    return;
-  }
-  circle->Y += 10;
+  Rectangle selectionRect = {
+      .x = (width >= 0) ? drag_start.x : drag_start.x + width,
+      .y = (height >= 0) ? drag_start.y : drag_start.y + height,
+      .width = fabsf(width),
+      .height = fabsf(height)};
+
+  DrawRectangleLinesEx(selectionRect, 1.0, GREEN);
+
+  return selectionRect;
 }
 
-#define MAX_CIRCLES 50
-
 int main(void) {
-  const int screenWidth = 800;
-  const int screenHeight = 800;
+  const int screenWidth = 2560;
+  const int screenHeight = 1440;
   Vector2 drag_start = {.x = 0.0, .y = 0.0};
   bool draggin = false;
+
+  Arena arena;
+  ArenaInit(&arena, 1024 * 1024 * 1024); // Should be 1 gibby
+
+  EntityArray entityArray;
+  EntityArray_INIT(&entityArray, &arena, 20);
+  EntityArray_SETUP(&entityArray);
+
+  ControlGroupArray *controlGroup = ControlGroupArray_INIT(&arena);
+  ControlGroup *mainControlGroup = &controlGroup->items[MAIN_CONTROL_GROUP];
+
+  /*SelectGroup *selectGroup = SelectGroup_INIT(&arena);*/
 
   InitWindow(screenWidth, screenHeight, "Raylib - Hello");
   SetTargetFPS(60);
@@ -42,6 +57,8 @@ int main(void) {
   while (!WindowShouldClose()) {
     bool left_click_pressed = IsMouseButtonPressed(0);
     bool left_click_down = IsMouseButtonDown(0);
+    HandleEntityClick(&entityArray, mainControlGroup);
+    DrawEntities(&entityArray, mainControlGroup);
 
     if (left_click_down && left_click_pressed) {
       drag_start = GetMousePosition();
@@ -53,15 +70,8 @@ int main(void) {
       draggin = false;
     }
     if (draggin) {
-      Vector2 current_mouse_pos = GetMousePosition();
-      float width = current_mouse_pos.x - drag_start.x;
-      float height = current_mouse_pos.y - drag_start.y;
-      Rectangle selectionRect = {
-          .x = (width >= 0) ? drag_start.x : drag_start.x + width,
-          .y = (height >= 0) ? drag_start.y : drag_start.y + height,
-          .width = fabsf(width),
-          .height = fabsf(height)};
-      DrawRectangleRec(selectionRect, RED);
+      Rectangle selectRect = BoxSelect(drag_start);
+      printf("%f\n", selectRect.x);
     }
 
     BeginDrawing();
@@ -69,6 +79,7 @@ int main(void) {
     EndDrawing();
   }
 
+  ArenaDestroy(&arena);
   CloseWindow();
 
   return 0;
